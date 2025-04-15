@@ -82,7 +82,6 @@ void parse_command(char *buf, cmd_t *cmd) {
     // trim right whitespace
 	while (len > 0 && strchr(splitters, buf[len - 1]) != NULL)
         buf[--len] = 0;
-	
 
 	// marked for auto-complete
 	if (len > 0 && buf[len - 1] == '?') cmd->auto_complete = true;	
@@ -327,12 +326,26 @@ void prompt( cmd_t *cmd) {
 
 void process_command( cmd_t *cmd);
 
+// Helper function to run a .sh file. It only takes the name
+// of the .sh file as an argument, ASSUMING that the programmer has
+// already checked that it was a shell file beforehand.
+
 void run_shell_script(char* file_name) {
 	char buffer[512];
 	FILE *script_file = fopen(file_name, "r");
 	
+	if (script_file == NULL) {
+		return;
+	}
+	
+	// Code to iterate over the file line by line.
 	while (fgets(buffer, sizeof(buffer), script_file)) {
-		printf("%s", buffer);
+		buffer[strcspn(buffer, "\n")] = 0; // Removes any occurrence of a newline.
+		// Here, I used the same logic as the main function. Each
+		// line is treated as a command, so a command struct is created.
+		// However, we don't want the terminal to ask for a user prompt,
+		// so I simply parsed the line and turned it into a command,
+		// processed the command, and freed it.
 		cmd_t *cmd = malloc(sizeof( cmd_t));
 		memset(cmd, 0, sizeof( cmd_t));
 		parse_command(buffer, cmd);
@@ -344,6 +357,9 @@ void run_shell_script(char* file_name) {
 int main(int argc, char*argv[]) {
 
     // TODO: see the top of the source code
+    // If the main function is provided with 2 arguments and the last
+    // argument contains ".sh", then we should execute the provided shell
+    // file. After execution, the terminal exits as instructed.
     if (argc == 2 && strstr(argv[1], ".sh") != NULL) {
 	    run_shell_script(argv[1]);
 	    return 0;
