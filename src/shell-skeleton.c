@@ -423,7 +423,7 @@ void process_command( cmd_t *cmd) {
 			break; // I can terminate the loop now as the current "full_path" variable is correct.
 		}
 
-		curr_directory = strtok(path_copy, NULL); // Keep tokenizing until we find a path.
+		curr_directory = strtok(NULL, ":"); // Keep tokenizing until we find a path.
 
 	}
 	
