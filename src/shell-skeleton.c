@@ -14,7 +14,7 @@ const int groupSize = 2; // TODO: change to 2 if you are two people
 const char *student1Name = "Yamaç Ömür";
 const char *student1Id = "0079458";
 const char *student2Name = "Sinemis Toktaş";
-const char *student2Id = "76644";
+const char *student2Id = "0076644";
 
 
 
@@ -390,6 +390,48 @@ void process_command( cmd_t *cmd) {
 
     // TODO: implement path resolution here, if you can't locate the
     // command print error message and return before forking!
+    
+    	// I call the "getenv" function here to find the "PATH" environment
+	// variable. This will basically return the possible directories
+	// for executable files, which I will manually check for the absolute path.
+    	char *path_env = getenv("PATH")
+	
+	if (path_env == NULL) {
+		printf("ERROR!: The PATH environment variable was not set.");
+		return;
+	}
+	
+	// Allocated space for a copy of the path environment, since I will be manipulating it.
+	char* path_copy = strdup(path_env);
+	// The path variable contains a list of possible execution paths delimited by ":". So, I tokenize
+	// the string to access each path.
+	char* curr_directory = strtok(path_copy, ":");
+	bool path_found = false;
+
+	while (curr_directory != NULL) {
+		char full_path[512];
+		// I append the name of the command to the curr_directory string, resulting in a possible 
+		// path of execution.
+		snprintf(full_path, sizeof(full_path), "%s%s", curr_directory, cmd->name);
+		
+		// The following function checks whether there is really a path which is executable
+		// on that specified address. "X_OK" indicates "executable".
+		if (access(full_path, X_OK) == 0) {
+			path_found = true;
+			break; // I can terminate the loop now as the current "full_path" variable is correct.
+		}
+
+		curr_directory = strtok(path_copy, NULL) // Keep tokenizing until we find a path.
+
+	}
+	
+	if (!path_found) {
+		printf("ERROR!: Couldn't locate the command you have requested.");
+		free(path_copy);
+		return;
+	}
+
+	free(path_copy); // Free the memory allocated copy.
 
     // Command is not a builtin then
 	pid_t pid = fork();
@@ -402,7 +444,9 @@ void process_command( cmd_t *cmd) {
 		// as required by exec
 
 		// TODO: implement exec for the resolved path using execv()
-		execvp(cmd->name, cmd->args); // <- DO NOT USE THIS, replace it with execv()
+		// execvp(cmd->name, cmd->args); // <- DO NOT USE THIS, replace it with execv()
+		
+		execv(full_path, cmd->args); // Loads the located file into the child process for execution.
 
         // if exec fails print error message
         // normally you should never reach here
