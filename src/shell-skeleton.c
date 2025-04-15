@@ -333,6 +333,11 @@ void run_shell_script(char* file_name) {
 	
 	while (fgets(buffer, sizeof(buffer), script_file)) {
 		printf("%s", buffer);
+		cmd_t *cmd = malloc(sizeof( cmd_t));
+		memset(cmd, 0, sizeof( cmd_t));
+		parse_command(buffer, cmd);
+		process_command(cmd);
+		free_command(cmd);
 	}
 }
 
