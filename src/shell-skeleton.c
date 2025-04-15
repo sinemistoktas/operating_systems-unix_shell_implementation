@@ -394,7 +394,7 @@ void process_command( cmd_t *cmd) {
     	// I call the "getenv" function here to find the "PATH" environment
 	// variable. This will basically return the possible directories
 	// for executable files, which I will manually check for the absolute path.
-    	char *path_env = getenv("PATH")
+    	char *path_env = getenv("PATH");
 	
 	if (path_env == NULL) {
 		printf("ERROR!: The PATH environment variable was not set.");
@@ -421,7 +421,7 @@ void process_command( cmd_t *cmd) {
 			break; // I can terminate the loop now as the current "full_path" variable is correct.
 		}
 
-		curr_directory = strtok(path_copy, NULL) // Keep tokenizing until we find a path.
+		curr_directory = strtok(path_copy, NULL); // Keep tokenizing until we find a path.
 
 	}
 	
