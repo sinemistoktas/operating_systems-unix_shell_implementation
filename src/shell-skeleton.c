@@ -327,9 +327,23 @@ void prompt( cmd_t *cmd) {
 
 void process_command( cmd_t *cmd);
 
-int main() {
+void run_shell_script(char* file_name) {
+	char buffer[512];
+	FILE *script_file = fopen(file_name, "r");
+	
+	while (fgets(buffer, sizeof(buffer), script_file)) {
+		printf("%s", buffer);
+	}
+}
+
+int main(int argc, char*argv[]) {
 
     // TODO: see the top of the source code
+    if (argc == 2 && strstr(argv[1], ".sh") != NULL) {
+	    run_shell_script(argv[1]);
+	    return 0;
+    }
+
     printf("\n%s Shell implemented by %s (%s)",sysname,student1Name,student1Id);
     if(groupSize>1) printf(" and %s (%s)",student2Name,student2Id);
     printf("\n");
