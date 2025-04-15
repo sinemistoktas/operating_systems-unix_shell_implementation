@@ -10,11 +10,11 @@
 const char *sysname = "ˢˡᵃsh"; 
 
 // TODO : Fill below
-const int groupSize = 1; // TODO: change to 2 if you are two people
-const char *student1Name = " ***FILL HERE*** ";
-const char *student1Id = " ***FILL HERE*** ";
-const char *student2Name = " ***FILL HERE*** ";
-const char *student2Id = " ***FILL HERE*** ";
+const int groupSize = 2; // TODO: change to 2 if you are two people
+const char *student1Name = "Yamaç Ömür";
+const char *student1Id = "0079458";
+const char *student2Name = "Sinemis Toktaş";
+const char *student2Id = "76644";
 
 
 
