@@ -395,7 +395,6 @@ void process_command( cmd_t *cmd) {
 	// variable. This will basically return the possible directories
 	// for executable files, which I will manually check for the absolute path.
     	char *path_env = getenv("PATH");
-	
 	if (path_env == NULL) {
 		printf("ERROR!: The PATH environment variable was not set.");
 		return;
@@ -413,8 +412,7 @@ void process_command( cmd_t *cmd) {
 		char full_path[512];
 		// I append the name of the command to the curr_directory string, resulting in a possible 
 		// path of execution.
-		snprintf(full_path, sizeof(full_path), "%s%s", curr_directory, cmd->name);
-		
+		snprintf(full_path, sizeof(full_path), "%s/%s", curr_directory, cmd->name);
 		// The following function checks whether there is really a path which is executable
 		// on that specified address. "X_OK" indicates "executable".
 		if (access(full_path, X_OK) == 0) {
