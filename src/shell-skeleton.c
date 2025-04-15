@@ -407,6 +407,7 @@ void process_command( cmd_t *cmd) {
 	// the string to access each path.
 	char* curr_directory = strtok(path_copy, ":");
 	bool path_found = false;
+	char* path_to_execute;
 
 	while (curr_directory != NULL) {
 		char full_path[512];
@@ -418,6 +419,7 @@ void process_command( cmd_t *cmd) {
 		// on that specified address. "X_OK" indicates "executable".
 		if (access(full_path, X_OK) == 0) {
 			path_found = true;
+			path_to_execute = full_path;
 			break; // I can terminate the loop now as the current "full_path" variable is correct.
 		}
 
@@ -446,7 +448,7 @@ void process_command( cmd_t *cmd) {
 		// TODO: implement exec for the resolved path using execv()
 		// execvp(cmd->name, cmd->args); // <- DO NOT USE THIS, replace it with execv()
 		
-		execv(full_path, cmd->args); // Loads the located file into the child process for execution.
+		execv(path_to_execute, cmd->args); // Loads the located file into the child process for execution.
 
         // if exec fails print error message
         // normally you should never reach here
