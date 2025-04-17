@@ -415,7 +415,7 @@ void process_command( cmd_t *cmd) {
 	char *tab_path_copy = strdup(tab_path_env);
 	char *tab_curr_directory = strtok(tab_path_copy, ":");
 	char **matching_exes = malloc(sizeof(char *) * MAX_MATCHES);
-	int match_count;
+	int match_count = 0;
 
 	while (tab_curr_directory != NULL) {
 		DIR *directory = opendir(tab_curr_directory);
