@@ -433,8 +433,6 @@ void process_command( cmd_t *cmd) {
 						strcpy(matching_exes[match_count], entry->d_name);
 						match_count++;
 
-						printf("Added the string %s\n", entry->d_name);
-
 					}
 				}
 			}
@@ -442,12 +440,18 @@ void process_command( cmd_t *cmd) {
 		closedir(directory);
 		tab_curr_directory = strtok(NULL, ":");
 	}
+
+	for (int i=0; i < match_count; i++) {
+		printf("%s\n", matching_exes[i]);
+	}
+	fflush(stdout);
 	
 	for (int i=0; i < match_count; i++) {
 		free(matching_exes[i]);
 	}
 
 	free(tab_path_copy);
+	free(matching_exes);
 
         return;
     }
