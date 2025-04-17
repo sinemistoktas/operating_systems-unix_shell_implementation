@@ -467,6 +467,7 @@ void process_command( cmd_t *cmd) {
 									printf("%s\n", dir_entry->d_name);
 									}
 								closedir(user_directory);
+								free(tab_path_copy);
 								return;
 							}
 						}
