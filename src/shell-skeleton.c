@@ -10,6 +10,7 @@
 #define MAX_MATCHES 128 // For the auto-complete functionality.
 
 const char *sysname = "ˢˡᵃsh"; 
+char autocomplete_buf[512] = {0};
 
 // TODO : Fill below
 const int groupSize = 2; // TODO: change to 2 if you are two people
@@ -31,6 +32,7 @@ typedef struct cmd_t {
 } cmd_t;
 
 
+void process_command(cmd_t *cmd);
 
 // Release allocated memory for a command structure
 void free_command(cmd_t *cmd) {
@@ -306,6 +308,21 @@ void prompt( cmd_t *cmd) {
 
 		buf[index++] = c; // add the character to buffer
 		if (index >= sizeof(buf) - 1) break; // too long
+		if (autocomplete_buf[0]) {
+			size_t current_len = index;
+			size_t match_len = strlen(autocomplete_buf);
+
+			if (match_len> current_len) {
+				char *remaining = autocomplete_buf + current_len;
+				strcat(buf, remaining);
+				printf("%s", remaining);
+				index += strlen(remaining);
+			}
+
+			autocomplete_buf[0] = '\0';
+			continue;
+		}
+
 
 		if (c == '\n') // enter key
 			break;
@@ -325,8 +342,6 @@ void prompt( cmd_t *cmd) {
 	tcsetattr(STDIN_FILENO, TCSANOW, &backup_termios);
 }
 
-
-void process_command( cmd_t *cmd);
 
 // Helper function to run a .sh file. It only takes the name
 // of the .sh file as an argument, ASSUMING that the programmer has
@@ -452,17 +467,18 @@ void process_command( cmd_t *cmd) {
 
 	printf("\n");
 
-	if (!matching_exes[1]) {
-		printf("\r\033[2K"); // Clear the current line.
-		// What to do here
+	if (match_count == 1) {
+		extern char autocomplete_buf[512];
+		snprintf(autocomplete_buf, sizeof(autocomplete_buf), "%s", matching_exes[0]);
 		return;
 	}
 
 	for (int i=0; i < match_count; i++) {
 		printf("%s\n", matching_exes[i]);
 	}
+
 	fflush(stdout);
-	
+
 	for (int i=0; i < match_count; i++) {
 		free(matching_exes[i]);
 	}
