@@ -6,6 +6,8 @@
 #include <sys/wait.h> // waitpid()
 #include <termios.h> // termios, TCSANOW, ECHO, ICANON
 #include <unistd.h> // POSIX API: fork()
+#include <dirent.h> // For directory operations
+#define MAX_MATCHES 128 // For the auto-complete functionality.
 
 const char *sysname = "ˢˡᵃsh"; 
 
@@ -404,10 +406,46 @@ void process_command( cmd_t *cmd) {
 
     if (cmd->auto_complete){
         // TODO: think about commands marked as auto-complete, they will not be executed just completed
-        printf("\nAuto-complete not implemented yet!\n");
-        return;
-    }
+        char *tab_path_env = getenv("PATH");
+	if (tab_path_env == NULL) {
+		printf("ERROR!: Your PATH environment variable was not set. Please do not try to use the autocomplete functionality.");
+		return;
+	}
 
+	char *tab_path_copy = strdup(tab_path_env);
+	char *tab_curr_directory = strtok(tab_path_copy, ":");
+	char **matching_exes = malloc(sizeof(char *) * MAX_MATCHES);
+	int match_count;
+
+	while (tab_curr_directory != NULL) {
+		DIR *directory = opendir(tab_curr_directory);
+		if (directory) {
+			struct dirent *entry;
+			while ((entry = readdir(directory)) != NULL) {
+				char tab_full_path[512];
+				if (strncmp(entry->d_name, cmd->name, strlen(cmd->name)) == 0) {		
+					snprintf(tab_full_path, sizeof(tab_full_path), "%s/%s", tab_curr_directory, entry->d_name);
+					if (access(tab_full_path, X_OK) == 0) {
+					//TODO: what do we do when we find an executable file with the same
+					// name as the user's input command's name
+						matching_exes[match_count] = malloc(strlen(entry->d_name) + 1);
+						strcpy(matching_exes[match_count], entry->d_name);
+						match_count++;
+
+						printf("Added the string %s\n", entry->d_name);
+
+				}
+			}
+		}
+	}
+	
+	for (int i=0; i < match_count; i++) {
+		free(matching_exes[i]);
+	}
+
+        return;
+    	}
+    }
 
     if (cmd->next != NULL){
         // TODO: consider pipe chains
