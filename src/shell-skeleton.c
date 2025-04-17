@@ -406,7 +406,9 @@ void process_command( cmd_t *cmd) {
 
     if (cmd->auto_complete){
         // TODO: think about commands marked as auto-complete, they will not be executed just completed
-	cmd->name[strlen(cmd->name) - 1] = 0;
+	if (cmd->name && strlen(cmd->name) > 0 && cmd->name[strlen(cmd->name) - 1] == '?') {
+		cmd->name[strlen(cmd->name) - 1] = 0;
+	}
         char *tab_path_env = getenv("PATH");
 	if (tab_path_env == NULL) {
 		printf("ERROR!: Your PATH environment variable was not set. Please do not try to use the autocomplete functionality.");
@@ -424,9 +426,16 @@ void process_command( cmd_t *cmd) {
 			struct dirent *entry;
 			while ((entry = readdir(directory)) != NULL) {
 				char tab_full_path[512];
-				if (strncmp(entry->d_name, cmd->name, strlen(cmd->name)) == 0) {		
+				if (strncmp(entry->d_name, cmd->name, strlen(cmd->name)) == 0) {
+					bool already_in_array = false;
+					for (int i = 0; i < match_count; i++) {
+						if (strcmp(matching_exes[i], entry->d_name) == 0) {
+							already_in_array = true;
+							break;
+						}
+					}		
 					snprintf(tab_full_path, sizeof(tab_full_path), "%s/%s", tab_curr_directory, entry->d_name);
-					if (access(tab_full_path, X_OK) == 0) {
+					if (access(tab_full_path, X_OK) == 0 && !already_in_array) {
 					//TODO: what do we do when we find an executable file with the same
 					// name as the user's input command's name
 						matching_exes[match_count] = malloc(strlen(entry->d_name) + 1);
@@ -439,6 +448,14 @@ void process_command( cmd_t *cmd) {
 		}
 		closedir(directory);
 		tab_curr_directory = strtok(NULL, ":");
+	}
+
+	printf("\n");
+
+	if (!matching_exes[1]) {
+		printf("\r\033[2K"); // Clear the current line.
+		// What to do here
+		return;
 	}
 
 	for (int i=0; i < match_count; i++) {
