@@ -426,6 +426,7 @@ void process_command( cmd_t *cmd) {
 	if (cmd->name && strlen(cmd->name) > 0 && cmd->name[strlen(cmd->name) - 1] == '?') {
 		cmd->name[strlen(cmd->name) - 1] = 0;
 	}
+
         char *tab_path_env = getenv("PATH");
 	if (tab_path_env == NULL) {
 		printf("ERROR!: Your PATH environment variable was not set. Please do not try to use the autocomplete functionality.");
@@ -455,6 +456,20 @@ void process_command( cmd_t *cmd) {
 					if (access(tab_full_path, X_OK) == 0 && !already_in_array) {
 					//TODO: what do we do when we find an executable file with the same
 					// name as the user's input command's name
+						char command_full_path[512];
+						snprintf(command_full_path, sizeof(command_full_path), "%s/%s", tab_curr_directory, cmd->name);
+						if (strcmp(tab_full_path, command_full_path) == 0) {
+							DIR *user_directory = opendir(".");
+							if (user_directory) {
+								printf("\n");
+								struct dirent *dir_entry;
+								while ((dir_entry = readdir(user_directory)) != NULL) {
+									printf("%s\n", dir_entry->d_name);
+									}
+								closedir(user_directory);
+								return;
+							}
+						}
 						matching_exes[match_count] = malloc(strlen(entry->d_name) + 1);
 						strcpy(matching_exes[match_count], entry->d_name);
 						match_count++;
@@ -467,11 +482,20 @@ void process_command( cmd_t *cmd) {
 		tab_curr_directory = strtok(NULL, ":");
 	}
 
+	free(tab_path_copy);
+
 	printf("\n");
+	
+	if (match_count == 0) {
+		printf("No matches found!\n");
+		free(matching_exes);
+		return;
+	}
 
 	if (match_count == 1) {
-		extern char autocomplete_buf[512];
 		snprintf(autocomplete_buf, sizeof(autocomplete_buf), "%s", matching_exes[0]);
+		free(matching_exes[0]);
+		free(matching_exes);
 		return;
 	}
 
@@ -485,7 +509,6 @@ void process_command( cmd_t *cmd) {
 		free(matching_exes[i]);
 	}
 
-	free(tab_path_copy);
 	free(matching_exes);
 
         return;
