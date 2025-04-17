@@ -342,7 +342,7 @@ void run_shell_script(char* file_name) {
 	
 	// Code to iterate over the file line by line.
 	while (fgets(buffer, sizeof(buffer), script_file)) {
-		buffer[strcspn(buffer, "\n")] = 0; // Removes any occurrence of a newline.
+		buffer[strcspn(buffer, "\n")] = 0; // Removes the first occurrence of a newline.
 		// Here, I used the same logic as the main function. Each
 		// line is treated as a command, so a command struct is created.
 		// However, we don't want the terminal to ask for a user prompt,
