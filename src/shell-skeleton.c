@@ -309,15 +309,17 @@ void prompt( cmd_t *cmd) {
 		buf[index++] = c; // add the character to buffer
 		if (index >= sizeof(buf) - 1) break; // too long
 		if (autocomplete_buf[0]) {
-			size_t current_len = index;
-			size_t match_len = strlen(autocomplete_buf);
-
-			if (match_len> current_len) {
-				char *remaining = autocomplete_buf + current_len;
-				strcat(buf, remaining);
-				printf("%s", remaining);
-				index += strlen(remaining);
+			
+			while (index > 0) {
+				putchar(8);
+				putchar(' ');
+				putchar(8);
+				index--;
 			}
+
+			strcpy(buf, autocomplete_buf);
+			printf("%s", buf);
+			index = strlen(buf);
 
 			autocomplete_buf[0] = '\0';
 			continue;
