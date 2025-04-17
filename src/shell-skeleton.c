@@ -434,17 +434,21 @@ void process_command( cmd_t *cmd) {
 
 						printf("Added the string %s\n", entry->d_name);
 
+					}
 				}
 			}
 		}
+		closedir(directory);
+		tab_curr_directory = strtok(NULL, ":");
 	}
 	
 	for (int i=0; i < match_count; i++) {
 		free(matching_exes[i]);
 	}
 
+	free(tab_path_copy);
+
         return;
-    	}
     }
 
     if (cmd->next != NULL){
