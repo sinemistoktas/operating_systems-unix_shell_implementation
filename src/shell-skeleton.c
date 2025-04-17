@@ -406,6 +406,7 @@ void process_command( cmd_t *cmd) {
 
     if (cmd->auto_complete){
         // TODO: think about commands marked as auto-complete, they will not be executed just completed
+	cmd->name[strlen(cmd->name) - 1] = 0;
         char *tab_path_env = getenv("PATH");
 	if (tab_path_env == NULL) {
 		printf("ERROR!: Your PATH environment variable was not set. Please do not try to use the autocomplete functionality.");
