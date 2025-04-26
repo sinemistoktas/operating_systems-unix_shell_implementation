@@ -75,9 +75,9 @@ void show_prompt() {
 
 // Parse a command string into a command struct
 void parse_command(char *buf, cmd_t *cmd) {
-	const char *splitters = " \t"; // split at space and tab
+	const char *splitters = " \t"; // split at space and tab -> define space and tab as seperators
 	int index, len;
-	len = strlen(buf);
+	len = strlen(buf); // get length of input string
 
 	// trim left whitespace
 	while (len > 0 && strchr(splitters, buf[0]) != NULL) {
@@ -90,38 +90,39 @@ void parse_command(char *buf, cmd_t *cmd) {
         buf[--len] = 0;
 
 	// marked for auto-complete
-	if (len > 0 && buf[len - 1] == '?') cmd->auto_complete = true;	
+	if (len > 0 && buf[len - 1] == '?') cmd->auto_complete = true;	// if command ends with ? mark it for auto-complete
 
 	// background execution
-	if (len > 0 && buf[len - 1] == '&')	cmd->background = true;	
+	if (len > 0 && buf[len - 1] == '&')	cmd->background = true;	// if command ends with & mark it for background-execution
 
-
-	char *pch = strtok(buf, splitters);
-	if (pch == NULL) {
+	// parse command name
+	char *pch = strtok(buf, splitters); // get the first token
+	if (pch == NULL) { // if token is empty create an empty name
 		cmd->name = (char *)malloc(1);
 		cmd->name[0] = 0;
-	} else {
+	} else { // alloc memory and copy the command name
 		cmd->name = (char *)malloc(strlen(pch) + 1);
 		strcpy(cmd->name, pch);
 	}
 
-	cmd->args = (char **)malloc(sizeof(char *));
+	cmd->args = (char **)malloc(sizeof(char *)); // init arguments array
 
-	int redirect_index;
-	int arg_index = 0;
-	char temp_buf[1024], *arg;
+	int redirect_index; // for tracking redirections
+	int arg_index = 0; // for tracking argument indices
+	char temp_buf[1024], *arg; // for temporary buffers-> temp_buf: temp space to hold a word, arg: pointer that will point inside temp_buf
 
-	while (1) {
+	while (1) { // iteratively continue tokenizing 
 		// tokenize input on splitters
-		pch = strtok(NULL, splitters);
-		if (!pch) break;
+		pch = strtok(NULL, splitters); // NULL tells strtok to continue from where you left off
+		if (!pch) break; // breaks when there are no more token
 
-		arg = temp_buf;
-		strcpy(arg, pch);
+		arg = temp_buf; 
+		strcpy(arg, pch); // copy token to temporary buffer
 		len = strlen(arg);
 
+		// trim whitespaces from both ends of the token
 		// trim left whitespace
-		while (len > 0 && strchr(splitters, arg[0]) != NULL) {
+		while (len > 0 && strchr(splitters, arg[0]) != NULL) { 
 			arg++;
 			len--;
 		}
@@ -132,12 +133,13 @@ void parse_command(char *buf, cmd_t *cmd) {
 		
 
 		// empty arg, go for next
-		if (len == 0) continue;
+		if (len == 0) continue; // skips empty argument
 		
 
+		// pipe handling -> if the argument is a pipe symbol "|", recursively parse the remaining command 
 		// mark for piping to another command
-		if (strcmp(arg, "|") == 0) {
-            cmd_t *c = malloc(sizeof( cmd_t));
+		if (strcmp(arg, "|") == 0) { 
+            cmd_t *c = malloc(sizeof( cmd_t)); // create a new command structure for the command after pipe
 			int l = strlen(pch);
 			pch[l] = splitters[0]; // restore strtok termination
 			index = 1;
@@ -146,14 +148,17 @@ void parse_command(char *buf, cmd_t *cmd) {
 
 			parse_command(pch + index, c);
 			pch[l] = 0; // put back strtok termination
-			cmd->next = c;
+			cmd->next = c; // link c to current command
 			continue;
 		}
 
+		// background process handling
 		// background process; already marked in cmd
 		if (strcmp(arg, "&") == 0) continue;
+		// if the argument is "&", it is already marked earlier, skip it
 		
 
+		// I/O redirection handling
 		// mark IO redirection
 		redirect_index = -1;
 		if (arg[0] == '<') {
@@ -161,6 +166,7 @@ void parse_command(char *buf, cmd_t *cmd) {
 		}
 
 		if (arg[0] == '>') {
+			printf("arg: %s\n", arg+1); // debug
 			if (len > 1 && arg[1] == '>') {
 				redirect_index = 2; // 2 -> append output to file >>
 				arg++;
@@ -171,8 +177,24 @@ void parse_command(char *buf, cmd_t *cmd) {
 		}
 
 		if (redirect_index != -1) {
-			cmd->redirects[redirect_index] = malloc(len);
-			strcpy(cmd->redirects[redirect_index], arg + 1);
+			// Check if filename is included in arg -> example: >out.txt
+			if (len>1) {
+				cmd->redirects[redirect_index] = malloc(len);
+				strcpy(cmd->redirects[redirect_index], arg + 1); // store the filename that follows the redirection symbol
+			} 
+			else { // for cases when there is space after redirection symbol -> example: > out.txt
+				pch = strtok(NULL, splitters); // parse again to get the filename
+				
+				if (pch == NULL) {
+					printf("ERROR! : No filename provided after redirection symbol\n");
+					break;
+				}
+
+				cmd->redirects[redirect_index] = malloc(strlen(pch) + 1);
+				strcpy(cmd->redirects[redirect_index], pch); // store the filename that follows the redirection symbol
+
+			}
+			
 			continue;
 		}
 
@@ -181,16 +203,20 @@ void parse_command(char *buf, cmd_t *cmd) {
 			((arg[0] == '"' && arg[len - 1] == '"') ||
 			 (arg[0] == '\'' && arg[len - 1] == '\''))) // quote wrapped arg
 		{
-			arg[--len] = 0;
+			// gets rid of quotes from start and end
+			arg[--len] = 0; 
 			arg++;
 		}
 
-		cmd->args = (char **)realloc(cmd->args, sizeof(char *) * (arg_index + 1));
+		// store normal arguments
+		cmd->args = (char **)realloc(cmd->args, sizeof(char *) * (arg_index + 1)); // reallocate arguments array to make room for the new argument
 
-		cmd->args[arg_index] = (char *)malloc(len + 1);
-		strcpy(cmd->args[arg_index++], arg);
+		cmd->args[arg_index] = (char *)malloc(len + 1); // allocate memory for the new argument
+		strcpy(cmd->args[arg_index++], arg); // copy the new argument and increment the argument index
 	}
-	cmd->arg_count = arg_index;
+
+	// finalize the arguments array
+	cmd->arg_count = arg_index; // store number of arguments in the argument counter
 
     // first argument should be the name of the executable
     // last argument should be NULL to delimit the end
@@ -593,31 +619,37 @@ void process_command( cmd_t *cmd) {
 			int fd = open(cmd->redirects[0], O_RDONLY); // Open the file for reading 
 		 
 			if (fd == -1){ // open() failed
-				print("ERROR! : Problem about input redirection (<)");
+				printf("ERROR! : Problem about input redirection (<)");
+				exit(1);
 			}
 
 			dup2(fd, STDIN_FILENO); // redirect stdin to the file
 			close(fd); // close file descriptor 
 		}
 
-		if (cmd->redirects[1]){ // for the > case
-			int fd = open(cmd->redirects[1], O_WRONLY | O_CREAT | O_TRUNC, // Open the file for writing, if it doesn't exist create a new file, if it exists delete it -> overwrite it				
-			FILE_MODE); // Create file permissions: user read and write, group read, other read
+		else if (cmd->redirects[1]){ // for the > case
+
+			int fd = open(cmd->redirects[1], O_WRONLY | O_CREAT | O_TRUNC, // Open the file for writing, if it doesn't exist create a new file, if it exists delete it -> overwrite it
+				FILE_MODE); // Create file permissions: user read and write, group read, other read
 		 
 			if (fd == -1){ // open() failed
-				print("ERROR! : Problem about output redirection (>)");
+				printf("ERROR! : Problem about output redirection (>)");
+				printf("ERROR! : Problem about output redirection (>): %s\n", strerror(errno));
+				printf("redirect to: %s\n", cmd->redirects[1]);
+				exit(1);
 			}
 
 			dup2(fd, STDOUT_FILENO); // redirect stdout  to the file
 			close(fd); // close file descriptor 
 		}
 
-		if (cmd->redirects[2]){ // for the >> case
+		else if (cmd->redirects[2]){ // for the >> case
 			int fd = open(cmd->redirects[2], O_WRONLY | O_CREAT | O_APPEND, // Open the file for writing, if it doesn't exist create a new file, if it exists append to existing file			
 			FILE_MODE); // Create file permissions: user read and write, group read, other read
 		 
 			if (fd == -1){ // open() failed
-				print("ERROR! : Problem about append redirection (>>)");
+				printf("ERROR! : Problem about append redirection (>>)");
+				exit(1);
 			}
 
 			dup2(fd, STDOUT_FILENO); // redirect stdout  to the file
@@ -631,7 +663,7 @@ void process_command( cmd_t *cmd) {
 		execv(path_to_execute, cmd->args); // Loads the located file into the child process for execution.
 
         // if exec fails print error message
-		print("ERROR! : Failed to execute comment: %s\n", cmd->name);
+		printf("ERROR! : Failed to execute comment: %s\n", cmd->name);
 
         // normally you should never reach here
         exit(-1);
