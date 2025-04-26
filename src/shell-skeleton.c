@@ -472,7 +472,7 @@ bool resolve_path(const char* cmd_name, char* path_result){
 	}
 	
 	if (!path_found) {
-		printf("ERROR! : Couldn't locate the command: %s\n", cmd_name);
+		printf("ERROR! %s: command not found\n", cmd_name);
 	}
 
 	free(path_copy); // Free the memory allocated copy.
@@ -592,79 +592,79 @@ void process_command( cmd_t *cmd) {
 
     if (cmd->next != NULL){
         // TODO: consider pipe chains
-
 		// I followed a similar path to the examples from the book
-		int pipeFd[2]; // create file descriptor
-		if (pipe(pipeFd) == -1){ 
-			fprintf(stderr, "Pipe failed");
-			return;
-		} // else, create pipe
+		int input_fd = STDIN_FILENO; // to keep track of where each process takes input from
+		cmd_t *current = cmd;
 
-		// Resolve paths for both of the commands: left and right
-		char path_to_execute_left[512];
-		char path_to_execute_right[512];
-
-		if (!resolve_path(cmd->name, path_to_execute_left)){
-			// couldn't locate the first command
-			close(pipeFd[0]);
-			close(pipeFd[1]);
-			return;
-		}
-
-		if (!resolve_path(cmd->next->name, path_to_execute_right)){
-			// couldn't locate the second command
-			close(pipeFd[0]);
-			close(pipeFd[1]);
-			return;
-		}
-
-		// First fork for the left command
-		pid_t pidLeft = fork(); // create child process for left side of the pipe | -> which is the first command we should execute since piping execution order goes from left to right
-
-		if (pidLeft < 0) { // fork failed
-			fprintf(stderr, "Fork for first child failed");
-			return;
-		}
+		while (current != NULL){ // start loop for multiple pipes
 		
-		else if (pidLeft == 0){
-			// LEFT COMMAND -> FIRST CHILD
-			close(pipeFd[READ_END]); // close read end of pipe for left child
-			dup2(pipeFd[WRITE_END], STDOUT_FILENO); // redirect stdout to write end of left child
-			close(pipeFd[WRITE_END]); // close write end of pipe for left child since we already duplicated it 
+			// first, resolve path  
+			char path_to_execute[512];
+			if (!resolve_path(current->name, path_to_execute)){
+				// couldn't locate the current command
+				current = current->next; // normal linux terminal still continued when there was a unlocatable command in the piping, it showed ouput when there was a valid command at the end
+				continue;
+			}
 
-			execv(path_to_execute_left, cmd->args); // execute left command
-			// if exec fails 
-			printf("execv for left command failed -> command name: %s\n", cmd->name);
-			exit(1); // exit failure
-		}
+			int pipeFd[2]; // create file descriptor
 
-		// Second fork for the right command
-		pid_t pidRight = fork(); // create child process for right side of the pipe | -> which is the second command we should execute since piping execution order goes from left to right
-
-		if (pidRight < 0) { // fork failed
-			fprintf(stderr, "Fork for second child failed");
-			return;
-		}
+			if (current->next != NULL){ // create a pipe if there is still a next command -> meaning there is still a "|" remaining on right side of our command
+				if (pipe(pipeFd) == -1){ 
+					fprintf(stderr, "Pipe failed");
+					exit(1); // exit failure
+				} // else, create pipe
+			}
 		
-		else if (pidRight == 0){
-			// RIGHT COMMAND -> SECOND CHILD
-			close(pipeFd[WRITE_END]); // close write end of pipe for left child
-			dup2(pipeFd[READ_END], STDIN_FILENO); // redirect stdin to read end of right child
-			close(pipeFd[READ_END]); // close read end of pipe for right child since we already duplicated it 
 
-			execv(path_to_execute_right, cmd->next->args); // execute right command
-			// if exec fails 
-			printf("execv for right command failed -> command name: %s\n", cmd->next->name);
-			exit(1); // exit failure
+			// Create a new child process for the current command
+			pid_t pidP = fork(); 
+
+			if (pidP < 0) { // fork failed
+				fprintf(stderr, "Fork failed");
+				exit(1);
+			}
+
+			else if (pidP == 0) {
+				// CHILD 
+				if (input_fd != STDIN_FILENO){ // handle input redirection
+					dup2(input_fd, STDIN_FILENO); // if input shouln't be coming from keyboard(STDIN_FILENO) make it come from previous command's output
+					// input_fd is updated for each next command at the end of the loop
+					// dup2 makes STDIN_FILENO be a copy of input_fd -> replace stdin with whatever input_fd is pointing to
+					close(input_fd); // after duplicating input_fd, it is not needed, so we close it 
+				}
+
+				if (current->next != NULL){ // handle output redirection, if there is a next command connect stdout to the pipe's write end
+					close(pipeFd[READ_END]); // close read end of pipe for left command
+					dup2(pipeFd[WRITE_END], STDOUT_FILENO); // redirect stdout to write end of left command
+					// replace stdout with write end of pipe -> output of current command is sent to next (right) command
+					close(pipeFd[WRITE_END]); // close write end of pipe for left command since we already duplicated it 
+				}
+
+				execv(path_to_execute, current->args); // execute current command
+				// if exec fails
+				printf("execv for pipe command failed -> command name: %s\n", current->name);
+				exit(1); 
+			}
+
+			else if (pidP > 0) {
+				// PARENT
+
+				if (input_fd != STDIN_FILENO){ 
+					close(input_fd); // if input_fd was an earlier pipe, close it
+				}
+
+				if (current->next != NULL){ // set up input_fd for next command
+					close(pipeFd[WRITE_END]); // parent no longer needs the write-end
+					input_fd = pipeFd[READ_END]; // to change stdin next command -> next command will read from the output of the current command
+				}
+			}
+			
+			current = current->next; // move to the next command in the pipeline
 		}
-
-		// PARENT
-		close(pipeFd[READ_END]);
-		close(pipeFd[WRITE_END]);
-		waitpid(pidLeft, NULL, 0);
-		waitpid(pidRight, NULL, 0);
-
-		return; // to stop continuing since we did execv inside the block
+		// after forking all processes, parent waits 
+		while (wait(NULL) > 0);
+	
+		return; // to stop continuing since we did execv inside the block -> to avoid extra fork/exec
     }
 
 
