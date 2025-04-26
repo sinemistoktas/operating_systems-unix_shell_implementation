@@ -8,6 +8,8 @@
 #include <unistd.h> // POSIX API: fork()
 #include <dirent.h> // For directory operations
 #define MAX_MATCHES 128 // For the auto-complete functionality.
+#include <fcntl.h> // for open()
+#define FILE_MODE (S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH) // Create file permissions 
 
 const char *sysname = "ˢˡᵃsh"; 
 char autocomplete_buf[512] = {0};
@@ -429,7 +431,7 @@ void process_command( cmd_t *cmd) {
 
         char *tab_path_env = getenv("PATH");
 	if (tab_path_env == NULL) {
-		printf("ERROR!: Your PATH environment variable was not set. Please do not try to use the autocomplete functionality.");
+		printf("ERROR! : Your PATH environment variable was not set. Please do not try to use the autocomplete functionality.");
 		return;
 	}
 
@@ -524,8 +526,11 @@ void process_command( cmd_t *cmd) {
 
     if (cmd->redirects[0] != NULL || cmd->redirects[1] != NULL || cmd->redirects[2] != NULL){
         // TODO: consider stdin/stdout redirects
-        printf("\nStdIn/StdOut redirection not implemented yet!\n");
-        return;
+        //printf("\nStdIn/StdOut redirection not implemented yet!\n");
+        //return;
+
+		// redirection is done after forking to protect parent(shell) code
+		// after fork, we redirect stdout/stdin to a file in the child process 
     }
 
 
@@ -537,7 +542,7 @@ void process_command( cmd_t *cmd) {
 	// for executable files, which I will manually check for the absolute path.
     	char *path_env = getenv("PATH");
 	if (path_env == NULL) {
-		printf("ERROR!: The PATH environment variable was not set.");
+		printf("ERROR! : The PATH environment variable was not set.");
 		return;
 	}
 	
@@ -567,7 +572,7 @@ void process_command( cmd_t *cmd) {
 	}
 	
 	if (!path_found) {
-		printf("ERROR!: Couldn't locate the command you have requested.");
+		printf("ERROR! : Couldn't locate the command you have requested.");
 		free(path_copy);
 		return;
 	}
@@ -584,14 +589,53 @@ void process_command( cmd_t *cmd) {
 		// add a NULL argument to the end of args, and the name to the beginning
 		// as required by exec
 
+		if (cmd->redirects[0]){ // for the < case
+			int fd = open(cmd->redirects[0], O_RDONLY); // Open the file for reading 
+		 
+			if (fd == -1){ // open() failed
+				print("ERROR! : Problem about input redirection (<)");
+			}
+
+			dup2(fd, STDIN_FILENO); // redirect stdin to the file
+			close(fd); // close file descriptor 
+		}
+
+		if (cmd->redirects[1]){ // for the > case
+			int fd = open(cmd->redirects[1], O_WRONLY | O_CREAT | O_TRUNC, // Open the file for writing, if it doesn't exist create a new file, if it exists delete it -> overwrite it				
+			FILE_MODE); // Create file permissions: user read and write, group read, other read
+		 
+			if (fd == -1){ // open() failed
+				print("ERROR! : Problem about output redirection (>)");
+			}
+
+			dup2(fd, STDOUT_FILENO); // redirect stdout  to the file
+			close(fd); // close file descriptor 
+		}
+
+		if (cmd->redirects[2]){ // for the >> case
+			int fd = open(cmd->redirects[2], O_WRONLY | O_CREAT | O_APPEND, // Open the file for writing, if it doesn't exist create a new file, if it exists append to existing file			
+			FILE_MODE); // Create file permissions: user read and write, group read, other read
+		 
+			if (fd == -1){ // open() failed
+				print("ERROR! : Problem about append redirection (>>)");
+			}
+
+			dup2(fd, STDOUT_FILENO); // redirect stdout  to the file
+			close(fd); // close file descriptor 
+		}
+
+
 		// TODO: implement exec for the resolved path using execv()
 		// execvp(cmd->name, cmd->args); // <- DO NOT USE THIS, replace it with execv()
 		
 		execv(path_to_execute, cmd->args); // Loads the located file into the child process for execution.
 
         // if exec fails print error message
+		print("ERROR! : Failed to execute comment: %s\n", cmd->name);
+
         // normally you should never reach here
         exit(-1);
+
 	} else {
         // PARENT
 
