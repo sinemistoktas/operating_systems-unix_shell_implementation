@@ -434,7 +434,7 @@ int main(int argc, char*argv[]) {
 }
 
 // Helper func to resolve the path of a command before execution 
-bool resolve_path(const char *cmd_name, char *path_result){
+bool resolve_path(const char* cmd_name, char* path_result){
 	// I call the "getenv" function here to find the "PATH" environment variable. 
 	// This will basically return the possible directories for executable files, 
 	// which I will manually check for the absolute path.
@@ -457,7 +457,7 @@ bool resolve_path(const char *cmd_name, char *path_result){
 		char full_path[512];
 		// I append the name of the command to the curr_directory string, resulting in a possible 
 		// path of execution.
-		snprintf(full_path, sizeof(full_path), "%s/%s", curr_directory, cmd->name);
+		snprintf(full_path, sizeof(full_path), "%s/%s", curr_directory, cmd_name);
 		// The following function checks whether there is really a path which is executable
 		// on that specified address. "X_OK" indicates "executable".
 		if (access(full_path, X_OK) == 0) {
@@ -472,7 +472,7 @@ bool resolve_path(const char *cmd_name, char *path_result){
 	}
 	
 	if (!path_found) {
-		printf("ERROR! : Couldn't locate the command: %s\n", cmd->name);
+		printf("ERROR! : Couldn't locate the command: %s\n", cmd_name);
 	}
 
 	free(path_copy); // Free the memory allocated copy.
@@ -593,11 +593,12 @@ void process_command( cmd_t *cmd) {
     if (cmd->next != NULL){
         // TODO: consider pipe chains
 
+		// I followed a similar path to the examples from the book
 		int pipeFd[2]; // create file descriptor
-		if (pipe(pipeFd) == -1){
-			perror("pipe");
+		if (pipe(pipeFd) == -1){ 
+			fprintf(stderr, "Pipe failed");
 			return;
-		} // create pipe
+		} // else, create pipe
 
 		// Resolve paths for both of the commands: left and right
 		char path_to_execute_left[512];
@@ -620,15 +621,50 @@ void process_command( cmd_t *cmd) {
 		// First fork for the left command
 		pid_t pidLeft = fork(); // create child process for left side of the pipe | -> which is the first command we should execute since piping execution order goes from left to right
 
-		if (pidLeft == 0){
-			// LEFT CHILD -> FIRST CHILD
+		if (pidLeft < 0) { // fork failed
+			fprintf(stderr, "Fork for first child failed");
+			return;
+		}
+		
+		else if (pidLeft == 0){
+			// LEFT COMMAND -> FIRST CHILD
 			close(pipeFd[READ_END]); // close read end of pipe for left child
 			dup2(pipeFd[WRITE_END], STDOUT_FILENO); // redirect stdout to write end of left child
 			close(pipeFd[WRITE_END]); // close write end of pipe for left child since we already duplicated it 
 
-
+			execv(path_to_execute_left, cmd->args); // execute left command
+			// if exec fails 
+			printf("execv for left command failed -> command name: %s\n", cmd->name);
+			exit(1); // exit failure
 		}
 
+		// Second fork for the right command
+		pid_t pidRight = fork(); // create child process for right side of the pipe | -> which is the second command we should execute since piping execution order goes from left to right
+
+		if (pidRight < 0) { // fork failed
+			fprintf(stderr, "Fork for second child failed");
+			return;
+		}
+		
+		else if (pidRight == 0){
+			// RIGHT COMMAND -> SECOND CHILD
+			close(pipeFd[WRITE_END]); // close write end of pipe for left child
+			dup2(pipeFd[READ_END], STDIN_FILENO); // redirect stdin to read end of right child
+			close(pipeFd[READ_END]); // close read end of pipe for right child since we already duplicated it 
+
+			execv(path_to_execute_right, cmd->next->args); // execute right command
+			// if exec fails 
+			printf("execv for right command failed -> command name: %s\n", cmd->next->name);
+			exit(1); // exit failure
+		}
+
+		// PARENT
+		close(pipeFd[READ_END]);
+		close(pipeFd[WRITE_END]);
+		waitpid(pidLeft, NULL, 0);
+		waitpid(pidRight, NULL, 0);
+
+		return; // to stop continuing since we did execv inside the block
     }
 
 
@@ -707,7 +743,7 @@ void process_command( cmd_t *cmd) {
 		execv(path_to_execute, cmd->args); // Loads the located file into the child process for execution.
 
         // if exec fails print error message
-		printf("ERROR! : Failed to execute comment: %s\n", cmd->name);
+		printf("ERROR! : Failed to execute command: %s\n", cmd->name);
 
         // normally you should never reach here
         exit(-1);
