@@ -10,6 +10,8 @@
 #define MAX_MATCHES 128 // For the auto-complete functionality.
 #include <fcntl.h> // for open()
 #define FILE_MODE (S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH) // Create file permissions 
+#define READ_END 0 // for pipe logic
+#define WRITE_END 1 // for pipe logic
 
 const char *sysname = "ˢˡᵃsh"; 
 char autocomplete_buf[512] = {0};
@@ -431,6 +433,51 @@ int main(int argc, char*argv[]) {
 	return 0;
 }
 
+// Helper func to resolve the path of a command before execution 
+bool resolve_path(const char *cmd_name, char *path_result){
+	// I call the "getenv" function here to find the "PATH" environment variable. 
+	// This will basically return the possible directories for executable files, 
+	// which I will manually check for the absolute path.
+    char *path_env = getenv("PATH");
+	if (path_env == NULL) {
+		printf("ERROR! : The PATH environment variable was not set.");
+		return false;
+	}
+	
+	// Allocated space for a copy of the path environment, since I will be manipulating it.
+	char* path_copy = strdup(path_env);
+	
+	// The path variable contains a list of possible execution paths delimited by ":". So, I tokenize
+	// the string to access each path.
+	char* curr_directory = strtok(path_copy, ":");
+	bool path_found = false;
+	//char* path_to_execute;
+
+	while (curr_directory != NULL) {
+		char full_path[512];
+		// I append the name of the command to the curr_directory string, resulting in a possible 
+		// path of execution.
+		snprintf(full_path, sizeof(full_path), "%s/%s", curr_directory, cmd->name);
+		// The following function checks whether there is really a path which is executable
+		// on that specified address. "X_OK" indicates "executable".
+		if (access(full_path, X_OK) == 0) {
+			path_found = true;
+			//path_to_execute = full_path;
+			strcpy(path_result, full_path);
+			break; // I can terminate the loop now as the current "full_path" variable is correct.
+		}
+
+		curr_directory = strtok(NULL, ":"); // Keep tokenizing until we find a path.
+
+	}
+	
+	if (!path_found) {
+		printf("ERROR! : Couldn't locate the command: %s\n", cmd->name);
+	}
+
+	free(path_copy); // Free the memory allocated copy.
+	return path_found;
+}
 
 void process_command( cmd_t *cmd) {
 
@@ -455,7 +502,7 @@ void process_command( cmd_t *cmd) {
 		cmd->name[strlen(cmd->name) - 1] = 0;
 	}
 
-        char *tab_path_env = getenv("PATH");
+    char *tab_path_env = getenv("PATH");
 	if (tab_path_env == NULL) {
 		printf("ERROR! : Your PATH environment variable was not set. Please do not try to use the autocomplete functionality.");
 		return;
@@ -545,8 +592,43 @@ void process_command( cmd_t *cmd) {
 
     if (cmd->next != NULL){
         // TODO: consider pipe chains
-        printf("\nPipe chains not implemented yet!\n");
-        return;
+
+		int pipeFd[2]; // create file descriptor
+		if (pipe(pipeFd) == -1){
+			perror("pipe");
+			return;
+		} // create pipe
+
+		// Resolve paths for both of the commands: left and right
+		char path_to_execute_left[512];
+		char path_to_execute_right[512];
+
+		if (!resolve_path(cmd->name, path_to_execute_left)){
+			// couldn't locate the first command
+			close(pipeFd[0]);
+			close(pipeFd[1]);
+			return;
+		}
+
+		if (!resolve_path(cmd->next->name, path_to_execute_right)){
+			// couldn't locate the second command
+			close(pipeFd[0]);
+			close(pipeFd[1]);
+			return;
+		}
+
+		// First fork for the left command
+		pid_t pidLeft = fork(); // create child process for left side of the pipe | -> which is the first command we should execute since piping execution order goes from left to right
+
+		if (pidLeft == 0){
+			// LEFT CHILD -> FIRST CHILD
+			close(pipeFd[READ_END]); // close read end of pipe for left child
+			dup2(pipeFd[WRITE_END], STDOUT_FILENO); // redirect stdout to write end of left child
+			close(pipeFd[WRITE_END]); // close write end of pipe for left child since we already duplicated it 
+
+
+		}
+
     }
 
 
@@ -562,48 +644,12 @@ void process_command( cmd_t *cmd) {
 
     // TODO: implement path resolution here, if you can't locate the
     // command print error message and return before forking!
-    
-    	// I call the "getenv" function here to find the "PATH" environment
-	// variable. This will basically return the possible directories
-	// for executable files, which I will manually check for the absolute path.
-    	char *path_env = getenv("PATH");
-	if (path_env == NULL) {
-		printf("ERROR! : The PATH environment variable was not set.");
+    char path_to_execute[512]; // path resolution using custom helper function resolve_path
+
+	if (!resolve_path(cmd->name, path_to_execute)){ // couldn't locate the command
 		return;
 	}
-	
-	// Allocated space for a copy of the path environment, since I will be manipulating it.
-	char* path_copy = strdup(path_env);
-	// The path variable contains a list of possible execution paths delimited by ":". So, I tokenize
-	// the string to access each path.
-	char* curr_directory = strtok(path_copy, ":");
-	bool path_found = false;
-	char* path_to_execute;
-
-	while (curr_directory != NULL) {
-		char full_path[512];
-		// I append the name of the command to the curr_directory string, resulting in a possible 
-		// path of execution.
-		snprintf(full_path, sizeof(full_path), "%s/%s", curr_directory, cmd->name);
-		// The following function checks whether there is really a path which is executable
-		// on that specified address. "X_OK" indicates "executable".
-		if (access(full_path, X_OK) == 0) {
-			path_found = true;
-			path_to_execute = full_path;
-			break; // I can terminate the loop now as the current "full_path" variable is correct.
-		}
-
-		curr_directory = strtok(NULL, ":"); // Keep tokenizing until we find a path.
-
-	}
-	
-	if (!path_found) {
-		printf("ERROR! : Couldn't locate the command you have requested.");
-		free(path_copy);
-		return;
-	}
-
-	free(path_copy); // Free the memory allocated copy.
+	 
 
     // Command is not a builtin then
 	pid_t pid = fork();
@@ -634,8 +680,6 @@ void process_command( cmd_t *cmd) {
 		 
 			if (fd == -1){ // open() failed
 				printf("ERROR! : Problem about output redirection (>)");
-				printf("ERROR! : Problem about output redirection (>): %s\n", strerror(errno));
-				printf("redirect to: %s\n", cmd->redirects[1]);
 				exit(1);
 			}
 
