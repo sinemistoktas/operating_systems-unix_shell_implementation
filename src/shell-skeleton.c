@@ -168,7 +168,6 @@ void parse_command(char *buf, cmd_t *cmd) {
 		}
 
 		if (arg[0] == '>') {
-			printf("arg: %s\n", arg+1); // debug
 			if (len > 1 && arg[1] == '>') {
 				redirect_index = 2; // 2 -> append output to file >>
 				arg++;
@@ -709,7 +708,7 @@ void process_command( cmd_t *cmd) {
 			close(fd); // close file descriptor 
 		}
 
-		else if (cmd->redirects[1]){ // for the > case
+		if (cmd->redirects[1]){ // for the > case
 
 			int fd = open(cmd->redirects[1], O_WRONLY | O_CREAT | O_TRUNC, // Open the file for writing, if it doesn't exist create a new file, if it exists delete it -> overwrite it
 				FILE_MODE); // Create file permissions: user read and write, group read, other read
@@ -723,7 +722,7 @@ void process_command( cmd_t *cmd) {
 			close(fd); // close file descriptor 
 		}
 
-		else if (cmd->redirects[2]){ // for the >> case
+		if (cmd->redirects[2]){ // for the >> case
 			int fd = open(cmd->redirects[2], O_WRONLY | O_CREAT | O_APPEND, // Open the file for writing, if it doesn't exist create a new file, if it exists append to existing file			
 			FILE_MODE); // Create file permissions: user read and write, group read, other read
 		 
@@ -736,6 +735,9 @@ void process_command( cmd_t *cmd) {
 			close(fd); // close file descriptor 
 		}
 
+		if (!cmd->redirects[0] && !cmd->redirects[1] && !cmd->redirects[2]){ // exit code when no file name after redirection is given
+			exit(1);
+		}
 
 		// TODO: implement exec for the resolved path using execv()
 		// execvp(cmd->name, cmd->args); // <- DO NOT USE THIS, replace it with execv()
@@ -744,7 +746,6 @@ void process_command( cmd_t *cmd) {
 
         // if exec fails print error message
 		printf("ERROR! : Failed to execute command: %s\n", cmd->name);
-
         // normally you should never reach here
         exit(-1);
 
