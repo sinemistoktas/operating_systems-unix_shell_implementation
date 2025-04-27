@@ -31,7 +31,6 @@ static ssize_t lsfd_write(struct file *file, const char __user *ubuf, size_t cou
 
 
 
-
 // A function that runs when the module is first loaded -> init
 int simple_init(void) {
 	struct task_struct *ts;
@@ -40,15 +39,28 @@ int simple_init(void) {
 
 	printk("Hello from the kernel");
 	printk("command: %s\n", ts->comm);
-	
+
+
+	output_buffer = kmalloc(BUFFER_SIZE, GFP_KERNEL);
+    if (!output_buffer)
+        return -ENOMEM;
+
+    proc_entry = proc_create("lsfd", 0666, NULL, &fops);
+    if (!proc_entry) {
+        kfree(output_buffer);
+        return -ENOMEM;
+    }
+
+    printk(KERN_INFO "lsfd module loaded successfully.\n");
 	return 0;
 }
 
 
 // A function that runs when the module is removed
 void simple_exit(void) {
-	
-	printk("Goodbye from the kernel");
+	proc_remove(proc_entry);
+    kfree(output_buffer);
+	printk(KERN_INFO "Goodbye from the kernel\n");
 }
 
 
