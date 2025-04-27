@@ -31,5 +31,26 @@ static ssize_t lsfd_write(struct file *file, const char __user *ubuf, size_t cou
 
 
 
+
+// A function that runs when the module is first loaded -> init
+int simple_init(void) {
+	struct task_struct *ts;
+
+	ts = get_pid_task(find_get_pid(4), PIDTYPE_PID);
+
+	printk("Hello from the kernel");
+	printk("command: %s\n", ts->comm);
+	
+	return 0;
+}
+
+
+// A function that runs when the module is removed
+void simple_exit(void) {
+	
+	printk("Goodbye from the kernel");
+}
+
+
 module_init(simple_init);
 module_exit(simple_exit);
