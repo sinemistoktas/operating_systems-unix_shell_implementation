@@ -29,6 +29,13 @@ static ssize_t lsfd_read(struct file *file, char __user *ubuf, size_t count, lof
 static ssize_t lsfd_write(struct file *file, const char __user *ubuf, size_t count, loff_t *ppos);
 
 
+// proc_ops struct
+static struct proc_ops fops = {
+    .proc_read = lsfd_read,
+    .proc_write = lsfd_write,
+};
+
+
 
 // Read operation: User reads from /proc/lsfd
 static ssize_t lsfd_read(struct file *file, char __user *ubuf, size_t count, loff_t *ppos)
@@ -43,7 +50,28 @@ static ssize_t lsfd_read(struct file *file, char __user *ubuf, size_t count, lof
     return output_size;
 }
 
+// Write operation: User writes PID into /proc/lsfd
+static ssize_t lsfd_write(struct file *file, const char __user *ubuf, size_t count, loff_t *ppos)
+{
+    char kbuf[16];
 
+    if (count >= sizeof(kbuf))
+        return -EINVAL;
+
+    if (copy_from_user(kbuf, ubuf, count))
+        return -EFAULT;
+
+    kbuf[count] = '\0';
+
+    if (kstrtoint(kbuf, 10, &target_pid) == 0) {
+        printk(KERN_INFO "lsfd: Received PID %d\n", target_pid);
+        build_fd_info(target_pid);
+    } else {
+        printk(KERN_INFO "lsfd: Invalid PID input\n");
+    }
+
+    return count;
+}
 
 
 // A function that runs when the module is first loaded -> init
