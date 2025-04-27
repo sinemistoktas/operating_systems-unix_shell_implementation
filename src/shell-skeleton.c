@@ -557,12 +557,63 @@ void process_command( cmd_t *cmd) {
 
 	if (strcmp(cmd->name, "lsfd") == 0) {
 		// Check if the user provided exactly 2 arguments (PID and output file)
-		if (cmd->arg_count != 3) { // "lsfd", <pid>, <outputfile>
+		if (cmd->arg_count != 4) { // "lsfd", <pid>, <outputfile>, NULL
             fprintf(stderr, "Usage: lsfd <PID> <output file>\n");
-            return SUCCESS;
+            return;
     	}
-		
 
+		// Build the path to the target process's fd directory in /proc
+		char proc_fd_path[512];
+		snprintf(proc_fd_path, sizeof(proc_fd_path), "/proc/%s/fd", cmd->args[1]);
+	
+		// Try to open the given process's fd directory
+		DIR *dir = opendir(proc_fd_path);
+		if (dir == NULL) {
+			perror("Cannot open /proc/<PID>/fd");
+			return;
+		}
+		
+		// Try to open the output file for writing
+		FILE *outfile = fopen(cmd->args[2], "w");
+		if (outfile == NULL) {
+			perror("Cannot open output file");
+			closedir(dir); // close directory if error happens
+			return;
+		}
+
+		// Variables for reading the directory entries and resolving symbolic links
+		struct dirent *entry; // for reading directory
+		char link_path[1024]; // for resolving symbolic links
+		char link_target[1024];
+	
+		// Loop through each entry inside /proc/<PID>/fd
+		while ((entry = readdir(dir)) != NULL) {
+			if (entry->d_name[0] == '.') // skip the . and .. entries
+				continue;
+	
+			// Build the full path of the file descriptor link
+			snprintf(link_path, sizeof(link_path), "%s/%s", proc_fd_path, entry->d_name);
+	
+			// Read the target that the symbolic link points to
+			ssize_t len = readlink(link_path, link_target, sizeof(link_target) - 1);
+			if (len == -1) {
+				// if the symbolic link can't be read skip it
+				continue;
+			}
+	
+			link_target[len] = '\0'; // null terminate link target
+	
+			// Write the fd and its resolved target into the output file
+			fprintf(outfile, "fd %s -> %s\n", entry->d_name, link_target);
+		}
+	
+		// Clean up on aisle 4
+		fclose(outfile); // Close output file
+		closedir(dir); // Close directory
+	
+	
+		return; // to continue running shell
+	}
 
 
     // TODO: implement other builtin commands here
