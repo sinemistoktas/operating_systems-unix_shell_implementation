@@ -7,12 +7,15 @@
 #include <termios.h> // termios, TCSANOW, ECHO, ICANON
 #include <unistd.h> // POSIX API: fork()
 #include <dirent.h> // For directory operations
-#define MAX_MATCHES 128 // For the auto-complete functionality.
 #include <fcntl.h> // for open()
+#include <sys/stat.h>   // for file modes
+#define MAX_MATCHES 128 // For the auto-complete functionality.
 #define FILE_MODE (S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH) // Create file permissions 
 #define READ_END 0 // for pipe logic
 #define WRITE_END 1 // for pipe logic
 #define MAX_HISTORY_SIZE 140 // for history
+#define MODULE_PATH "./mymodule.ko"  // Path to the kernel module
+#define PROC_PATH "/proc/mymodule"          // Path to the proc interface
 
 const char *sysname = "ˢˡᵃsh"; 
 
@@ -551,6 +554,16 @@ void process_command( cmd_t *cmd) {
 		}
 		return;
 	}
+
+	if (strcmp(cmd->name, "lsfd") == 0) {
+		// Check if the user provided exactly 2 arguments (PID and output file)
+		if (cmd->arg_count != 3) { // "lsfd", <pid>, <outputfile>
+            fprintf(stderr, "Usage: lsfd <PID> <output file>\n");
+            return SUCCESS;
+    	}
+		
+
+
 
     // TODO: implement other builtin commands here
     // do not forget to return from this method if cmd was a built-in and already processed
