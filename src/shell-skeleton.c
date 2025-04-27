@@ -188,6 +188,7 @@ void parse_command(char *buf, cmd_t *cmd) {
 				
 				if (pch == NULL) {
 					printf("ERROR! : No filename provided after redirection symbol\n");
+					cmd->name[0] = '\0'; // set command name empty
 					break;
 				}
 
@@ -641,8 +642,14 @@ void process_command( cmd_t *cmd) {
 
 				execv(path_to_execute, current->args); // execute current command
 				// if exec fails
-				printf("execv for pipe command failed -> command name: %s\n", current->name);
+				if (strcmp(current->name, "") == 0) {
+					printf("ERROR! : empty command after pipe");
+				}
+				else{
+					printf("execv for pipe command failed -> command name: %s\n", current->name);
 				exit(1); 
+				}
+				
 			}
 
 			else if (pidP > 0) {
@@ -674,6 +681,9 @@ void process_command( cmd_t *cmd) {
 
 		// redirection is done after forking to protect parent(shell) code
 		// after fork, we redirect stdout/stdin to a file in the child process 
+
+		// before fork, check for filename missing case
+		if ((strcmp(cmd->name, "")) == 0) return; // cmd name is set to \0 inside parser func when filename is missing
     }
 
 
@@ -735,9 +745,7 @@ void process_command( cmd_t *cmd) {
 			close(fd); // close file descriptor 
 		}
 
-		if (!cmd->redirects[0] && !cmd->redirects[1] && !cmd->redirects[2]){ // exit code when no file name after redirection is given
-			exit(1);
-		}
+		
 
 		// TODO: implement exec for the resolved path using execv()
 		// execvp(cmd->name, cmd->args); // <- DO NOT USE THIS, replace it with execv()
