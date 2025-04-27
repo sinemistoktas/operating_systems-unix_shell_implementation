@@ -35,7 +35,70 @@ static struct proc_ops fops = {
     .proc_write = lsfd_write,
 };
 
+// Helper function: Build FD info for a given PID
+static void build_fd_info(pid_t pid)
+{
+    struct task_struct *task;
+    struct files_struct *files;
+    struct fdtable *fdt;
+    struct file *f;
+    int i;
 
+	output_size = 0;
+    memset(output_buffer, 0, BUFFER_SIZE);
+
+    // Find the task_struct using PID
+    task = pid_task(find_get_pid(pid), PIDTYPE_PID);
+    if (!task) {
+        printk(KERN_INFO "lsfd: No such process with PID %d\n", pid);
+        return;
+    }
+
+	printk(KERN_INFO "lsfd: Found process %s (PID %d)\n", task->comm, pid);
+
+    rcu_read_lock();
+    files = task->files;
+    if (!files) {
+        rcu_read_unlock();
+        printk(KERN_INFO "lsfd: Process has no open files\n");
+        return;
+    }
+
+    spin_lock(&files->file_lock);
+    fdt = files_fdtable(files);
+
+    for (i = 0; i < fdt->max_fds; i++) {
+        f = fdt->fd[i];
+        if (f) {
+            struct dentry *dentry = f->f_path.dentry;
+            struct inode *inode = dentry->d_inode;
+            char *tmp;
+            char *pathname;
+
+            pathname = kmalloc(256, GFP_KERNEL);
+            if (!pathname)
+                continue;
+
+            tmp = d_path(&f->f_path, pathname, 256);
+            if (IS_ERR(tmp)) {
+                kfree(pathname);
+                continue;
+            }
+
+            output_size += scnprintf(output_buffer + output_size, BUFFER_SIZE - output_size,
+                                     "fd %d %s %lld bytes %s\n",
+                                     i,
+                                     dentry->d_name.name,
+                                     inode->i_size,
+                                     tmp);
+
+            kfree(pathname);
+        }
+    }
+
+    spin_unlock(&files->file_lock);
+    rcu_read_unlock();
+}
 
 // Read operation: User reads from /proc/lsfd
 static ssize_t lsfd_read(struct file *file, char __user *ubuf, size_t count, loff_t *ppos)
