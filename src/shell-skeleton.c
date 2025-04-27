@@ -15,7 +15,7 @@
 #define WRITE_END 1 // for pipe logic
 #define MAX_HISTORY_SIZE 140 // for history
 #define MODULE_PATH "./mymodule.ko"  // Path to the kernel module
-#define PROC_PATH "/proc/mymodule"          // Path to the proc interface
+#define PROC_PATH "/proc/lsfd" 
 
 const char *sysname = "ˢˡᵃsh"; 
 
@@ -458,6 +458,19 @@ void run_shell_script(char* file_name) {
 }
 
 int main(int argc, char*argv[]) {
+
+	// Check if kernel module is loaded, load it using sudo insmod if not
+	if (access("/proc/lsfd", F_OK) != 0) { // check if /proc/lsfd exist
+		printf("Kernel module not loaded. Loading now...\n");
+
+		int result = system("sudo insmod ./module/mymodule.ko"); // load the kernel module
+		if (result != 0){ // if loading fails
+			printf("ERROR ! : Kernel module loading has failed.");
+			exit(1); // can't continue without module
+		} 
+	} else{ // if already loaded, notify user
+		printf("Krnel module already loaded.");
+	}
 
     // TODO: see the top of the source code
     // If the main function is provided with 2 arguments and the last
