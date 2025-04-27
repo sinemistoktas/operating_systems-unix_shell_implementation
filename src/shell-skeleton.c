@@ -9,7 +9,7 @@
 #include <dirent.h> // For directory operations
 #include <fcntl.h> // for open()
 #include <sys/stat.h>   // for file modes
-#define MAX_MATCHES 128 // For the auto-complete functionality.
+#define MAX_MATCHES 256 // For the auto-complete functionality.
 #define FILE_MODE (S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH) // Create file permissions 
 #define READ_END 0 // for pipe logic
 #define WRITE_END 1 // for pipe logic
@@ -376,21 +376,21 @@ void prompt( cmd_t *cmd) {
 
 		buf[index++] = c; // add the character to buffer
 		if (index >= sizeof(buf) - 1) break; // too long
-		if (autocomplete_buf[0]) {
+		if (autocomplete_buf[0]) { // if the autocomplete buffer is full, meaning that there is something to autocomplete, :
 			
-			while (index > 0) {
+			while (index > 0) { // we first delete everything from the console.
 				putchar(8);
 				putchar(' ');
 				putchar(8);
 				index--;
 			}
 
-			strcpy(buf, autocomplete_buf);
+			strcpy(buf, autocomplete_buf); // then, we copy the autocompleted command name into the buffer and print it.
 			printf("%s", buf);
 			index = strlen(buf);
 
 			autocomplete_buf[0] = '\0';
-			continue;
+			continue; // continue, because the user might write some other file names etc.
 		}
 
 
@@ -623,11 +623,11 @@ void process_command( cmd_t *cmd) {
 
     if (cmd->auto_complete){
         // TODO: think about commands marked as auto-complete, they will not be executed just completed
-	if (cmd->name && strlen(cmd->name) > 0 && cmd->name[strlen(cmd->name) - 1] == '?') {
+	if (cmd->name && strlen(cmd->name) > 0 && cmd->name[strlen(cmd->name) - 1] == '?') { // First remove the "?" character.
 		cmd->name[strlen(cmd->name) - 1] = 0;
 	}
 
-    char *tab_path_env = getenv("PATH");
+    char *tab_path_env = getenv("PATH"); // we obtain the "PATH" environment variable of the user.
 	if (tab_path_env == NULL) {
 		printf("ERROR! : Your PATH environment variable was not set. Please do not try to use the autocomplete functionality.");
 		return;
@@ -635,7 +635,9 @@ void process_command( cmd_t *cmd) {
 
 	char *tab_path_copy = strdup(tab_path_env);
 	char *tab_curr_directory = strtok(tab_path_copy, ":");
-	char **matching_exes = malloc(sizeof(char *) * MAX_MATCHES);
+	char **matching_exes = malloc(sizeof(char *) * MAX_MATCHES); // This array contains the executable files with a name 
+								     // that matches what the user has typed. We set this array to have
+								     // at most 256 matches.
 	int match_count = 0;
 
 	while (tab_curr_directory != NULL) {
@@ -644,20 +646,22 @@ void process_command( cmd_t *cmd) {
 			struct dirent *entry;
 			while ((entry = readdir(directory)) != NULL) {
 				char tab_full_path[512];
-				if (strncmp(entry->d_name, cmd->name, strlen(cmd->name)) == 0) {
-					bool already_in_array = false;
-					for (int i = 0; i < match_count; i++) {
+				if (strncmp(entry->d_name, cmd->name, strlen(cmd->name)) == 0) { // If the first characters of the executable
+												 // file name match the user's input,:
+					bool already_in_array = false; // bool variable to ensure that the same file isn't written more than once.
+					for (int i = 0; i < match_count; i++) { // checks if the entry is already in the array. if yes, it stops.
 						if (strcmp(matching_exes[i], entry->d_name) == 0) {
 							already_in_array = true;
 							break;
 						}
 					}		
 					snprintf(tab_full_path, sizeof(tab_full_path), "%s/%s", tab_curr_directory, entry->d_name);
-					if (access(tab_full_path, X_OK) == 0 && !already_in_array) {
-					//TODO: what do we do when we find an executable file with the same
-					// name as the user's input command's name
+					if (access(tab_full_path, X_OK) == 0 && !already_in_array) { // If the file is executable, and if it
+												     // is not already in the matches array,:
 						char command_full_path[512];
 						snprintf(command_full_path, sizeof(command_full_path), "%s/%s", tab_curr_directory, cmd->name);
+						// Checks for the case when the user has already typed the full command name.
+						// If so, the files within the user's current directory will be displayed.
 						if (strcmp(tab_full_path, command_full_path) == 0) {
 							DIR *user_directory = opendir(".");
 							if (user_directory) {
@@ -671,6 +675,7 @@ void process_command( cmd_t *cmd) {
 								return;
 							}
 						}
+						// Adds the matching command name to the matching executable files directory.
 						matching_exes[match_count] = malloc(strlen(entry->d_name) + 1);
 						strcpy(matching_exes[match_count], entry->d_name);
 						match_count++;
@@ -687,19 +692,23 @@ void process_command( cmd_t *cmd) {
 
 	printf("\n");
 	
+	// No matches in the matches array.
 	if (match_count == 0) {
 		printf("No matches found!\n");
 		free(matching_exes);
 		return;
 	}
-
+	
+	// If there is only a single element in the array, this means that the command can be auto completed.
 	if (match_count == 1) {
-		snprintf(autocomplete_buf, sizeof(autocomplete_buf), "%s", matching_exes[0]);
+		snprintf(autocomplete_buf, sizeof(autocomplete_buf), "%s", matching_exes[0]); // Fills the autocomplete buffer, which is used
+											      // in the "prompt" function.
 		free(matching_exes[0]);
 		free(matching_exes);
 		return;
 	}
 
+	// Otherwise, if there are multiple matches, prints every match found.
 	for (int i=0; i < match_count; i++) {
 		printf("%s\n", matching_exes[i]);
 	}
