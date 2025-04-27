@@ -12,9 +12,15 @@
 #define FILE_MODE (S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH) // Create file permissions 
 #define READ_END 0 // for pipe logic
 #define WRITE_END 1 // for pipe logic
+#define HISTORY_SIZE 140 // for history
 
 const char *sysname = "ˢˡᵃsh"; 
+
 char autocomplete_buf[512] = {0};
+
+char history[HISTORY_SIZE][512]; // stores 140 rows of previous commands
+int history_count = 0; //sil?
+int history_pos = 0; //sil?
 
 // TODO : Fill below
 const int groupSize = 2; // TODO: change to 2 if you are two people
@@ -307,7 +313,8 @@ void prompt( cmd_t *cmd) {
 
             // UP ARROW - currently it has a limited history function, limited to only 1 prior command
 		    if (c == 65) {
-                buf[index] = 0;
+                buf[index] = 0; // nullify buffer
+				// visually clear everything from the terminal line:
 			    while (index > 0) { // delete everything
 				    putchar(8); // go back 1
 	                putchar(' '); // write empty over
@@ -315,13 +322,14 @@ void prompt( cmd_t *cmd) {
 				    index--;
 			    }
 
+				// swap the current buffer with oldbuf -> pressing UP arrow swaps in the last command
 			    char tmpbuf[512];	
 			    strcpy(tmpbuf, buf); // swap, we can't just exchange pointers because oldbuf is static therefore not on the heap
 			    strcpy(buf, oldbuf);
 			    strcpy(oldbuf, tmpbuf);
 
-                printf("%s", buf);           
-			    index = strlen(buf);			    
+                printf("%s", buf); // print last command           
+			    index = strlen(buf); // update index to match length of buffer			    
 		    }
 
 
@@ -330,7 +338,7 @@ void prompt( cmd_t *cmd) {
                 
             }
 
-            escape_code_state = 0;
+            escape_code_state = 0; // reset state 
             continue;
         }
 
@@ -369,6 +377,12 @@ void prompt( cmd_t *cmd) {
 	strcpy(oldbuf, buf);
 
 	parse_command(buf, cmd);
+
+	if (strlen(buf) > 0) { // save non-empty command to history
+		strcpy(history[history_count % HISTORY_SIZE], buf); // add current command to history array
+		history_count++; // update history counter
+		history_pos = history_count; // update history browsing position to point to most recend command
+	}
 
 	// MUST restore the old settings
 	tcsetattr(STDIN_FILENO, TCSANOW, &backup_termios);
@@ -489,6 +503,12 @@ void process_command( cmd_t *cmd) {
 			if (chdir(cmd->args[1]) == -1)
                 printf("- %s: %s  ---  %s\n", cmd->name, strerror(errno),cmd->args[1]);			            		
         return;
+	}
+	if (strcmp(cmd->name, "history") == 0) {
+		for (int i = 0; i<history_count; ++i){
+			printf("%d %s\n", i, history[i]);
+		}
+		return;
 	}
 
     // TODO: implement other builtin commands here
