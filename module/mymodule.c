@@ -30,6 +30,21 @@ static ssize_t lsfd_write(struct file *file, const char __user *ubuf, size_t cou
 
 
 
+// Read operation: User reads from /proc/lsfd
+static ssize_t lsfd_read(struct file *file, char __user *ubuf, size_t count, loff_t *ppos)
+{
+    if (*ppos > 0 || output_size == 0)
+        return 0;
+
+    if (copy_to_user(ubuf, output_buffer, output_size))
+        return -EFAULT;
+
+    *ppos = output_size;
+    return output_size;
+}
+
+
+
 
 // A function that runs when the module is first loaded -> init
 int simple_init(void) {
@@ -37,7 +52,7 @@ int simple_init(void) {
 
 	ts = get_pid_task(find_get_pid(4), PIDTYPE_PID);
 
-	printk("Hello from the kernel");
+	printk("lsfd: Hello from the kernel");
 	printk("command: %s\n", ts->comm);
 
 
@@ -51,7 +66,7 @@ int simple_init(void) {
         return -ENOMEM;
     }
 
-    printk(KERN_INFO "lsfd module loaded successfully.\n");
+    printk(KERN_INFO "lsfd: Module loaded successfully.\n");
 	return 0;
 }
 
@@ -60,7 +75,7 @@ int simple_init(void) {
 void simple_exit(void) {
 	proc_remove(proc_entry);
     kfree(output_buffer);
-	printk(KERN_INFO "Goodbye from the kernel\n");
+	printk(KERN_INFO "lsfd: Goodbye from the kernel\n");
 }
 
 
