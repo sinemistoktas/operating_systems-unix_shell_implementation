@@ -11,7 +11,25 @@
 #define BUFFER SIZE 128
 #define PROC NAME "lsfd"
 
-ssize_t proc_read(struct file *file, char __user *usr_buf, size_t count, loff_t *pos);
+/* This function is called each time /proc/hello is read */
+ssize_t proc_read(struct file *file, char __user *usr_buf, size_t count, loff_t *pos){
+    int rv = 0;
+    char buffer[BUFFER_SIZE]; 
+    static int completed = 0;
+
+    if (completed) { 
+        completed = 0;
+        return 0;
+    }
+    completed = 1;
+
+    rv = sprintf(buffer, "Hello World∖n");
+
+    /* copies kernel space buffer to user space usr buf */
+    copy_to_user(usr_buf, buffer, rv);
+    return rv;
+}
+
 
 static struct file_operations proc_ops = {
     .owner = THIS_MODULE,
