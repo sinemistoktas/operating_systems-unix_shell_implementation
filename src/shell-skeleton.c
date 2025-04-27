@@ -32,8 +32,6 @@ const char *student1Id = "0079458";
 const char *student2Name = "Sinemis Toktaş";
 const char *student2Id = "0076644";
 
-
-
 typedef struct cmd_t {
 	char *name;
 	bool background;
@@ -457,6 +455,30 @@ void run_shell_script(char* file_name) {
 	}
 }
 
+// Helper function to check if this is the last slash instance, and remove the kernel module if is
+void check_and_remove_module() {
+    FILE *fp;
+    char buffer[128];
+    int slash_count = 0;
+
+	// Get number of slash instances currently running
+    fp = popen("pgrep slash | wc -l", "r"); // Open a pipe to run the shell command
+    if (fp == NULL) {
+        perror("popen failed"); // Pipe creation failed
+        exit(1);
+    }
+
+    if (fgets(buffer, sizeof(buffer), fp) != NULL) { // Read output from command
+        slash_count = atoi(buffer); // Convert output string into an integer
+    }
+    pclose(fp); // Close the pipe
+
+    if (slash_count <= 1) { // If this is the last slash instance
+        printf("Last slash instance exiting. Removing kernel module...\n");
+        system("sudo rmmod mymodule"); // Remove the module
+    } 
+}
+
 int main(int argc, char*argv[]) {
 
 	// Check if kernel module is loaded, load it using sudo insmod if not
@@ -554,7 +576,14 @@ void process_command( cmd_t *cmd) {
 
     // built-ins
 	if (strcmp(cmd->name, "") == 0) return;
-	if (strcmp(cmd->name, "exit") == 0)  exit(0);
+	if (strcmp(cmd->name, "exit") == 0){
+		/*
+		before exiting, check if this is the last slash instance
+		if it is, remove the module from kernel
+		*/
+		check_and_remove_module(); // call helper func to handle last slash instance
+		exit(0); // exit like normal
+	}
 	if (strcmp(cmd->name, "cd") == 0) {
 		if (cmd->arg_count > 0) 
 			if (chdir(cmd->args[1]) == -1)
